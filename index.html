@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<!-- saved from url=(0142)http://localhost:63342/pythonProject_00/001_Assistant/agent_2/radar_report_v2.3.html?_ijt=303rvsdke2o98g27u818td14c0&_ij_reload=RELOAD_ON_SAVE -->
+<html lang="zh-CN"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <title>社区评估与跨表数据详情</title>
+    <!-- 引入 SheetJS (用于解析 Excel) -->
+    <script src="./radar_report/xlsx.full.min.js.下载"></script>
+    <!-- 引入 ECharts (用于绘制图表) -->
+    <script src="./radar_report/echarts.min.js.下载"></script>
+    <style>
+        body { font-family: "微软雅黑", sans-serif; display: flex; flex-direction: column; align-items: center; padding: 30px; background-color: #f4f7f9; }
+        .controls { margin-bottom: 20px; padding: 20px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; gap: 15px; align-items: center; flex-wrap: wrap;}
+
+        /* 搜索框样式 */
+        .search-wrapper { position: relative; display: inline-block; }
+        #communitySearch { padding: 8px 35px 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; width: 200px; outline: none; transition: border-color 0.3s; }
+        #communitySearch:focus { border-color: #36a2eb; }
+        .clear-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #999; font-size: 16px; display: none; user-select: none; }
+        .clear-btn:hover { color: #333; }
+
+        /* 排行榜区域样式 */
+        .ranking-container { display: flex; gap: 40px; margin-bottom: 20px; width: 1100px; justify-content: space-between; }
+        .ranking-box { flex: 1; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .ranking-box h3 { margin-top: 0; text-align: center; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .ranking-list { list-style: none; padding: 0; margin: 0; max-height: 200px; overflow-y: auto; }
+        .ranking-list li { padding: 8px 10px; border-bottom: 1px dashed #f0f0f0; display: flex; justify-content: space-between; cursor: pointer; transition: background 0.2s; }
+        .ranking-list li:hover { background-color: #f0f7ff; }
+        .rank-num { font-weight: bold; margin-right: 10px; color: #666; }
+        .top5 .rank-num { color: #e74c3c; }
+        .bottom5 .rank-num { color: #3498db; }
+        .score-val { color: #888; font-size: 0.9em; }
+
+        /* ⭐ 核心指标概览框体样式 (调整为7列) */
+        .metrics-container {
+            width: 1100px;
+            display: grid;
+            grid-template-columns: 1.2fr repeat(6, 1fr); /* 第一列（总分）稍宽，其余均分 */
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        /* 通用指标卡片样式 */
+        .metric-card {
+            background: white;
+            padding: 15px 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            text-align: center;
+            transition: transform 0.2s;
+            border-top: 4px solid #36a2eb;
+        }
+        .metric-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .metric-name { font-size: 13px; color: #666; margin-bottom: 8px; height: 36px; display: flex; align-items: center; justify-content: center; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+
+        /* 最高分和最低分的特殊样式 */
+        .metric-card.max-score { border-top-color: #e74c3c; background-color: #fffdfd; }
+        .metric-card.max-score .metric-value { color: #e74c3c; }
+        .metric-card.min-score { border-top-color: #3498db; background-color: #faffff; }
+        .metric-card.min-score .metric-value { color: #3498db; }
+
+        /* ⭐ 总分卡片的专属高亮样式 */
+        .metric-card.total-score-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-top: none;
+            color: white;
+            box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4);
+        }
+        .metric-card.total-score-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(118, 75, 162, 0.5); }
+        .metric-card.total-score-card .metric-name { color: rgba(255,255,255,0.9); font-size: 15px; font-weight: bold; height: auto; }
+        .metric-card.total-score-card .metric-value { color: #fff; font-size: 32px; margin-top: 5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+        /* 主内容区布局 */
+        .main-content { display: flex; gap: 20px; width: 1100px; align-items: flex-start; }
+        #radar-chart { flex: 1.5; height: 500px; background-color: #fff; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); }
+
+        /* 详细信息面板样式 */
+        .detail-panel { flex: 1; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); max-height: 500px; overflow-y: auto; }
+        .detail-panel h3 { margin-top: 0; text-align: center; color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; position: sticky; top: 0; background: white; z-index: 10; }
+        .detail-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .detail-table th, .detail-table td { padding: 10px; text-align: left; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+        .detail-table th { color: #666; font-weight: normal; width: 50%; background-color: #fafafa; }
+        .detail-table td { font-weight: bold; color: #333; text-align: right; }
+
+        select, input[type="file"] { padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; }
+        select { min-width: 200px; cursor: pointer; }
+        label { font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+<!-- 控制区域 -->
+<div class="controls">
+    <label for="excelFile">1. 上传Excel数据：</label>
+    <input type="file" id="excelFile" accept=".xlsx, .xls">
+
+    <!-- 社区搜索框 -->
+    <div class="search-wrapper">
+        <input type="text" id="communitySearch" placeholder="🔍 输入社区名称搜索..." disabled="">
+        <span class="clear-btn" id="clearSearch">×</span>
+    </div>
+
+    <label for="communitySelect">选择社区：</label>
+    <select id="communitySelect" disabled="">
+        <option value="">请先上传数据文件...</option>
+    </select>
+</div>
+
+<!-- 排行榜展示区域 -->
+<div class="ranking-container">
+    <div class="ranking-box top5">
+        <h3>🏆 总分前 5 名</h3>
+        <ul id="top5List" class="ranking-list">
+            <li>暂无数据</li>
+        </ul>
+    </div>
+    <div class="ranking-box bottom5">
+        <h3>📉 总分后 5 名</h3>
+        <ul id="bottom5List" class="ranking-list">
+            <li>暂无数据</li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⭐ 核心指标概览框体 (包含总分 + 6个维度) -->
+<div class="metrics-container" id="metricsContainer">
+    <!-- JS 会在这里动态插入总分卡片和6个维度卡片 -->
+</div>
+
+<!-- 核心内容区：左侧雷达图 + 右侧详细信息 -->
+<div class="main-content">
+    <div id="radar-chart" _echarts_instance_="ec_1779323182107" style="user-select: none; -webkit-tap-highlight-color: rgba(0, 0, 0, 0);"><div style="position: relative; width: 624px; height: 500px; padding: 0px; margin: 0px; border-width: 0px; cursor: default;"></div></div>
+
+    <div class="detail-panel">
+        <h3>📊 社区详细档案 (来自"数据"表)</h3>
+        <table class="detail-table">
+            <tbody id="detailTableBody">
+            <tr>
+                <td colspan="2" style="text-align:center; color:#999;">请选择社区查看</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const myChart = echarts.init(document.getElementById('radar-chart'));
+    let radarDataList = []; // 存放“雷达图”Sheet的数据
+    let rawDataMap = {};    // 存放“数据”Sheet的数据映射 (以社区名称为键)
+    let nameHeaderRadar = ''; // “雷达图”表中社区名称的表头
+    let searchTimer = null; // 搜索防抖定时器
+
+    // 预设6个核心维度
+    const fixedIndicators = [
+        { name: '市场发展', max: 100 },
+        { name: '建设覆盖', max: 100 },
+        { name: '装机难易', max: 100 },
+        { name: '用户感知', max: 100 },
+        { name: '网络质量-家庭网', max: 100 },
+        { name: '网络质量-接入网', max: 100 }
+    ];
+
+    // 辅助函数：去除字符串中的所有空白字符并转为统一格式
+    function cleanStr(str) {
+        return String(str).replace(/\s+/g, '').trim();
+    }
+
+    // 1. 监听文件上传，解析 Excel
+    document.getElementById('excelFile').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+
+            if (!workbook.SheetNames.includes('雷达图') || !workbook.SheetNames.includes('数据')) {
+                alert(`Excel中必须同时包含名为“雷达图”和“数据”的工作表！`);
+                return;
+            }
+
+            // 解析“雷达图”Sheet
+            const radarSheet = workbook.Sheets['雷达图'];
+            radarDataList = XLSX.utils.sheet_to_json(radarSheet, { defval: 0 });
+
+            // 解析“数据”Sheet
+            const dataSheet = workbook.Sheets['数据'];
+            const rawDetailsList = XLSX.utils.sheet_to_json(dataSheet, { defval: "" });
+
+            if (radarDataList.length > 0 && rawDetailsList.length > 0) {
+                // “雷达图”表固定取第3列（索引为2）作为社区名称
+                nameHeaderRadar = Object.keys(radarDataList[0])[2];
+
+                // 强制指定“数据”表中的社区名称在第7列（索引为6）
+                const dataHeaders = Object.keys(rawDetailsList[0]);
+                const dataNameHeaderIndex = 6;
+                const dataNameHeader = dataHeaders[dataNameHeaderIndex];
+
+                if (!dataNameHeader) {
+                    alert("“数据”表的第7列没有找到表头，请检查Excel格式！");
+                    return;
+                }
+
+                // 将“数据”Sheet转为 Map 结构
+                rawDataMap = {};
+                rawDetailsList.forEach(item => {
+                    const rawName = item[dataNameHeader];
+                    if (rawName) {
+                        rawDataMap[cleanStr(rawName)] = item;
+                    }
+                });
+
+                populateCommunitySelect(radarDataList);
+                updateRankingBoard(radarDataList);
+
+                // 启用搜索框和下拉框
+                document.getElementById('communitySearch').disabled = false;
+                document.getElementById('communitySelect').disabled = false;
+
+                if(radarDataList.length > 0) {
+                    document.getElementById('communitySelect').value = 0;
+                    updateAllViews(radarDataList[0]);
+                }
+            } else {
+                alert("工作表中没有发现有效数据！");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // 处理搜索框输入（带防抖功能）
+    document.getElementById('communitySearch').addEventListener('input', function(e) {
+        const keyword = e.target.value.trim();
+        const clearBtn = document.getElementById('clearSearch');
+
+        clearBtn.style.display = keyword ? 'block' : 'none';
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            filterCommunitySelect(keyword);
+        }, 300);
+    });
+
+    // 根据关键词筛选下拉菜单
+    function filterCommunitySelect(keyword) {
+        const select = document.getElementById('communitySelect');
+        const currentSelectedValue = select.value;
+
+        if (!keyword) {
+            populateCommunitySelect(radarDataList);
+        } else {
+            const filteredData = radarDataList.filter(item => {
+                const name = item[nameHeaderRadar];
+                return name && name.toString().includes(keyword);
+            });
+            populateCommunitySelect(filteredData);
+        }
+
+        if (currentSelectedValue && Array.from(select.options).some(opt => opt.value === currentSelectedValue)) {
+            select.value = currentSelectedValue;
+        } else {
+            select.value = "";
+        }
+    }
+
+    // 清空搜索框
+    document.getElementById('clearSearch').addEventListener('click', function() {
+        const searchInput = document.getElementById('communitySearch');
+        searchInput.value = '';
+        this.style.display = 'none';
+        filterCommunitySelect('');
+        searchInput.focus();
+    });
+
+    // 填充社区下拉菜单
+    function populateCommunitySelect(data) {
+        const select = document.getElementById('communitySelect');
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">-- 请选择一个社区 --</option>';
+
+        data.forEach((item, index) => {
+            const communityName = item[nameHeaderRadar];
+            const option = document.createElement('option');
+            const originalIndex = radarDataList.indexOf(item);
+            option.value = originalIndex;
+            option.text = communityName || `未命名社区 ${originalIndex + 1}`;
+            select.appendChild(option);
+        });
+
+        if (currentVal && Array.from(select.options).some(opt => opt.value === currentVal)) {
+            select.value = currentVal;
+        }
+    }
+
+    // 生成并渲染总分排行榜
+    function updateRankingBoard(data) {
+        const sortedData = [...data].sort((a, b) => (b['总分'] || 0) - (a['总分'] || 0));
+        const top5List = document.getElementById('top5List');
+        const bottom5List = document.getElementById('bottom5List');
+        top5List.innerHTML = '';
+        bottom5List.innerHTML = '';
+
+        sortedData.slice(0, 5).forEach((item, index) => {
+            const li = createRankItem(item, index + 1);
+            top5List.appendChild(li);
+        });
+
+        sortedData.slice(-5).reverse().forEach((item, index) => {
+            const rankNum = sortedData.length - 5 + index + 1;
+            const li = createRankItem(item, rankNum);
+            bottom5List.appendChild(li);
+        });
+    }
+
+    function createRankItem(item, rank) {
+        const li = document.createElement('li');
+        const name = item[nameHeaderRadar];
+        const score = item['总分'];
+        li.innerHTML = `<span><span class="rank-num">${rank}</span>${name}</span> <span class="score-val">${score}分</span>`;
+        li.onclick = () => {
+            const originalIndex = radarDataList.indexOf(item);
+            const select = document.getElementById('communitySelect');
+            select.value = originalIndex;
+            updateAllViews(radarDataList[originalIndex]);
+        };
+        return li;
+    }
+
+    // 监听下拉菜单变化
+    document.getElementById('communitySelect').addEventListener('change', function() {
+        const selectedIndex = this.value;
+        if (selectedIndex === "") return;
+        updateAllViews(radarDataList[selectedIndex]);
+    });
+
+    // 统一更新视图（核心指标框体 + 雷达图 + 详情面板）
+    function updateAllViews(targetRadarData) {
+        const communityName = targetRadarData[nameHeaderRadar] || '未知社区';
+        const values = fixedIndicators.map(indicator => targetRadarData[indicator.name] || 0);
+        const totalScore = targetRadarData['总分'] || 0; // 获取总分
+
+        // ⭐ 1. 更新核心指标概览框体 (传入总分和各项得分)
+        updateMetricsCards(totalScore, values);
+
+        // 2. 更新雷达图
+        const option = {
+            title: {
+                text: `${communityName} - 综合能力评估`,
+                left: 'center',
+                top: 10,
+                textStyle: { fontSize: 18, color: '#333', fontWeight: 'bold' }
+            },
+            tooltip: {},
+            radar: {
+                indicator: fixedIndicators,
+                shape: 'circle',
+                splitNumber: 5,
+                radius: '65%',
+                axisName: { color: '#333', fontSize: 13, fontWeight: 'bold', padding: [3, 5] },
+                splitArea: { areaStyle: { color: ['#f8f9fa', '#f8f9fa', '#f8f9fa', '#f8f9fa'] } }
+            },
+            series: [{
+                name: '社区评估',
+                type: 'radar',
+                data: [{
+                    value: values,
+                    name: communityName,
+                    areaStyle: { color: 'rgba(54, 162, 235, 0.4)' },
+                    lineStyle: { color: '#36a2eb', width: 3 },
+                    itemStyle: { color: '#36a2eb' }
+                }]
+            }]
+        };
+        myChart.setOption(option, true);
+
+        // 3. 更新右侧详细信息面板
+        updateDetailPanel(communityName, values);
+    }
+
+    // ⭐ 渲染核心指标卡片逻辑 (新增总分卡片)
+    function updateMetricsCards(totalScore, values) {
+        const container = document.getElementById('metricsContainer');
+        container.innerHTML = '';
+
+        // --- 第一步：渲染最左侧的“总分”高亮卡片 ---
+        const totalCardHtml = `
+            <div class="metric-card total-score-card">
+                <div class="metric-name">综合总分</div>
+                <div class="metric-value">${totalScore}</div>
+            </div>
+        `;
+        container.innerHTML += totalCardHtml;
+
+        // --- 第二步：渲染右侧的6个常规维度卡片 ---
+        const maxScore = Math.max(...values);
+        const minScore = Math.min(...values);
+
+        fixedIndicators.forEach((indicator, index) => {
+            const score = values[index];
+            let cardClass = 'metric-card';
+
+            // 根据分数高低添加不同的样式类
+            if (score === maxScore && score !== minScore) cardClass += ' max-score';
+            if (score === minScore && score !== maxScore) cardClass += ' min-score';
+
+            const cardHtml = `
+                <div class="${cardClass}">
+                    <div class="metric-name">${indicator.name}</div>
+                    <div class="metric-value">${score}</div>
+                </div>
+            `;
+            container.innerHTML += cardHtml;
+        });
+    }
+
+    // 匹配逻辑：支持模糊匹配和调试报错
+    function updateDetailPanel(communityName, radarValues) {
+        const tableBody = document.getElementById('detailTableBody');
+        tableBody.innerHTML = '';
+
+        const cleanedName = cleanStr(communityName);
+        let detailData = rawDataMap[cleanedName];
+
+        if (!detailData) {
+            const allDataNames = Object.keys(rawDataMap);
+            const fuzzyMatch = allDataNames.find(name => name.includes(cleanedName) || cleanedName.includes(name));
+            if (fuzzyMatch) {
+                detailData = rawDataMap[fuzzyMatch];
+            } else {
+                const sampleNames = Object.keys(rawDataMap).slice(0, 5).join('、');
+                alert(`❌ 匹配失败！\n\n雷达图中的名字：“${communityName}”\n(清理空格后：“${cleanedName}”)\n\n在“数据”表第7列未找到对应行。\n\n💡 请检查两表的社区名称是否有错别字？\n\n“数据”表中的前几个名字示例：\n${sampleNames}`);
+
+                tableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; color:#e74c3c;">未在“数据”表中找到该社区的详细信息<br><span style="font-size:12px;color:#999;">(已尝试模糊匹配，请核对Excel中两表的社区名称是否一致)</span></td></tr>`;
+                return;
+            }
+        }
+
+        let rowsHtml = '';
+        const keys = Object.keys(detailData);
+
+        keys.forEach(key => {
+            let value = detailData[key];
+            let className = '';
+
+            const isRadarDim = fixedIndicators.some(ind => ind.name === key);
+            if (isRadarDim) {
+                className = 'radar-dim';
+                if (value == maxScore && value !== minScore) className += ' highlight-max';
+                if (value == minScore && value !== maxScore) className += ' highlight-min';
+            }
+
+            rowsHtml += `
+                <tr>
+                    <th>${key}</th>
+                    <td class="${className}">${value}</td>
+                </tr>
+            `;
+        });
+
+        tableBody.innerHTML = rowsHtml;
+    }
+
+    window.addEventListener('resize', () => myChart.resize());
+</script>
+
+<script>
+(function() {
+  var ws = new WebSocket('ws://' + window.location.host + 
+             '/jb-server-page?reloadMode=RELOAD_ON_SAVE&'+
+             'referrer=' + encodeURIComponent(window.location.pathname));
+  ws.onmessage = function (msg) {
+      if (msg.data === 'reload') {
+          window.location.reload();
+      }
+      if (msg.data.startsWith('update-css ')) {
+          var messageId = msg.data.substring(11);
+          var links = document.getElementsByTagName('link');
+          for (var i = 0; i < links.length; i++) {
+              var link = links[i];
+              if (link.rel !== 'stylesheet') continue;
+              var clonedLink = link.cloneNode(true);
+              var newHref = link.href.replace(/(&|\?)jbUpdateLinksId=\d+/, "$1jbUpdateLinksId=" + messageId);
+              if (newHref !== link.href) {
+                clonedLink.href = newHref;
+              }
+              else {
+                var indexOfQuest = newHref.indexOf('?');
+                if (indexOfQuest >= 0) {
+                  // to support ?foo#hash 
+                  clonedLink.href = newHref.substring(0, indexOfQuest + 1) + 'jbUpdateLinksId=' + messageId + '&' + 
+                                    newHref.substring(indexOfQuest + 1);
+                }
+                else {
+                  clonedLink.href += '?' + 'jbUpdateLinksId=' + messageId;
+                }
+              }
+              link.replaceWith(clonedLink);
+          }
+      }
+  };
+})();
+</script></body></html>
